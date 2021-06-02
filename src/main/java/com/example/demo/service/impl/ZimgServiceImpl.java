@@ -29,17 +29,10 @@ public class ZimgServiceImpl implements ZimgService {
     private static final  String  deletePath ="/admin";
     @Override
     public String uploadImage(MultipartFile multipartFile) {
-        String url = zimgConfig.getZimgServer()+uploadPath;
-        String s = HttpClientUtil.postMultipartFileToImage(url,multipartFile);
-        ZimgResult zimgResult = JSONObject.parseObject(s,ZimgResult.class);
-        if(zimgResult.isRet()){
-            String imgUrl = zimgConfig.getRouter().trim()+"/"+zimgResult.getInfo().getMd5();
-            imgUrl= imgUrl.substring(1);
-            log.info("imgUrl={}",imgUrl.substring(1));
-            return imgUrl;
-        }else {
-            throw new DefaultException(ResultEnum.UPLOAD_ZIMG_ERROR.getCode(),zimgResult.getError().getMessage());
-        }
+        File file = new File(multipartFile.getName());
+        String url = uploadImage(file);
+        file.deleteOnExit();
+        return url;
     }
 
     @Override
@@ -51,8 +44,14 @@ public class ZimgServiceImpl implements ZimgService {
     @Override
     public String uploadImage(File file) {
         String url = zimgConfig.getZimgServer()+uploadPath;
-        String s = HttpClientUtil.postFileToImage(url,file);
-        ZimgResult zimgResult = JSONObject.parseObject(s,ZimgResult.class);
+        String fileName = file.getName();
+        String ext = fileName.substring(fileName.lastIndexOf(".") + 1);
+        Map<String,String> headers = new HashMap<>(4);
+        headers.put("Connection", "Keep-Alive");
+        headers.put("Cache-Control", "no-cache");
+        headers.put("Content-Type", ext.toLowerCase());
+        headers.put("COOKIE", "qixun");
+        ZimgResult zimgResult = HttpClientUtil.doPostFile(url,file,headers,ZimgResult.class);
         if(zimgResult.isRet()){
             String imgUrl = zimgConfig.getRouter().trim()+"/"+zimgResult.getInfo().getMd5();
             imgUrl= imgUrl.substring(1);
@@ -72,10 +71,8 @@ public class ZimgServiceImpl implements ZimgService {
         Map<String,String> params = new HashMap<>(2);
         params.put("md5",md5);
         params.put("t","1");
-        String s = HttpClientUtil.doGet(url,params,null);
-        System.out.println(s);
+        ZimgResult zimgResult = HttpClientUtil.doGet(url,params,ZimgResult.class);
         //这里因忘记ssh密码，暂时无法登陆服务器修改配置，所以不知道delete返回结果具体是什么。以下两行只是示意处理流程
-        ZimgResult zimgResult = JSONObject.parseObject(s,ZimgResult.class);
         return zimgResult.isRet();
     }
 
